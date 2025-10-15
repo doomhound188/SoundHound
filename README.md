@@ -1,0 +1,2 @@
+# SoundHound
+Discord Music Bot
