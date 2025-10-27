@@ -30,21 +30,22 @@ VOICE_CLIENTS = {}
 QUEUES = {}
 
 YTDLP_OPTS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best",
     "noplaylist": True,
     "quiet": True,
-    "default_search": "ytsearch",
-    "source_address": "0.0.0.0",
+    "default_search": "scsearch",
     "extract_flat": False,
+    "force_ipv4": True,
+    "geo_bypass": True,
 }
 
 FFMPEG_OPTIONS = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -allowed_extensions ALL",
     "options": "-vn -loglevel error",
 }
 
 SPOTIFY_TRACK_RE = re.compile(r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)")
-YOUTUBE_URL_RE = re.compile(r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+")
+SOUNDCLOUD_URL_RE = re.compile(r"https?://(on\.)?soundcloud\.com/.*")
 
 
 def get_queue(guild_id: int) -> deque:
@@ -60,7 +61,10 @@ def assert_ffmpeg():
         )
 
 
-def get_youtube_audio_source(query_or_url: str) -> tuple[str, str]:
+def get_audio_source(query_or_url: str) -> tuple[str, str]:
+    """
+    Gets a stream URL and title from yt-dlp (now searching SoundCloud).
+    """
     with yt_dlp.YoutubeDL(YTDLP_OPTS) as ytdl:
         info = ytdl.extract_info(query_or_url, download=False)
         if "entries" in info:
@@ -70,7 +74,12 @@ def get_youtube_audio_source(query_or_url: str) -> tuple[str, str]:
         stream_url = info.get("url")
         title = info.get("title", "Unknown")
         if not stream_url:
-            raise RuntimeError("Could not get audio stream URL")
+            for f in info.get("formats", []):
+                if f.get("protocol") == "hls" and f.get("url"):
+                    stream_url = f["url"]
+                    break
+            if not stream_url:
+                raise RuntimeError("Could not get audio stream URL")
         return stream_url, title
 
 
@@ -204,11 +213,11 @@ async def play(ctx: discord.ApplicationContext, query: str):
     try:
         if SPOTIFY_TRACK_RE.match(query):
             search_query = spotify_track_to_search_query(query)
-            stream_url, title = get_youtube_audio_source(search_query)
-        elif YOUTUBE_URL_RE.match(query):
-            stream_url, title = get_youtube_audio_source(query)
+            stream_url, title = get_audio_source(search_query)
+        elif SOUNDCLOUD_URL_RE.match(query):
+            stream_url, title = get_audio_source(query)
         else:
-            stream_url, title = get_youtube_audio_source(query)
+            stream_url, title = get_audio_source(query)
     except Exception as e:
         await ctx.respond(f"Lookup failed: {e}")
         return
@@ -232,7 +241,7 @@ async def queue_cmd(ctx: discord.ApplicationContext):
         await ctx.respond("Queue is empty.", ephemeral=True)
         return
 
-    embed = discord.Embed(title="🎵 Song Queue", color=discord.Color.blue())
+    embed = discord.Embed(title="Song Queue", color=discord.Color.blue())
 
     if vc and vc.is_playing():
         embed.add_field(name="Now Playing", value="Current song", inline=False)
