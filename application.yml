@@ -1,0 +1,18 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+lavalink:
+  server:
+    password: "${LAVALINK_PASSWORD}"
+  sources:
+    youtube: true
+    soundcloud: true
+    spotify: true
+  spotify:
+    clientId: "${SPOTIFY_CLIENT_ID}"
+    clientSecret: "${SPOTIFY_CLIENT_SECRET}"
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
