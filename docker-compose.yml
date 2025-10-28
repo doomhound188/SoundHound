@@ -1,6 +1,6 @@
 services:
   soundhound-bot:
-    image: ghrc.io/doomhound188/soundhound:latest
+    image: ghcr.io/doomhound188/soundhound:latest
     restart: unless-stopped
     env_file: .env
     depends_on:
@@ -19,7 +19,11 @@ services:
     volumes:
       - ./application.yml:/opt/Lavalink/application.yml
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2333/version"]
+      test:
+        [
+          "CMD-SHELL",
+          'curl -fsS -H "Authorization: Bearer ${LAVALINK_PASSWORD}" http://localhost:2333/version',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
