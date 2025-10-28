@@ -3,6 +3,7 @@ import re
 import asyncio
 import discord
 from discord.ext import commands
+from discord import app_commands
 from dotenv import load_dotenv
 import wavelink
 
@@ -14,7 +15,7 @@ LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = discord.Bot(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 @bot.event
@@ -36,7 +37,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 
 
 @bot.event
-async def on_wavelink_track_end(payload: wavelink.TrackEventPayload):
+async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
     """Event fired when a track ends. Used for auto-play."""
     player = payload.player
     if not player:
@@ -48,9 +49,7 @@ async def on_wavelink_track_end(payload: wavelink.TrackEventPayload):
         print(f"Error playing next track: {e}")
 
 
-async def get_or_connect_player(
-    ctx: discord.ApplicationContext,
-) -> wavelink.Player | None:
+async def get_or_connect_player(ctx) -> wavelink.Player | None:
     """Gets the player for the guild, or connects if not present."""
     if not ctx.author.voice or not ctx.author.voice.channel:
         await ctx.respond("You must be connected to a voice channel.", ephemeral=True)
@@ -72,86 +71,87 @@ async def get_or_connect_player(
         return None
 
 
-@bot.slash_command(
+@bot.tree.command(
     name="join", description="Invite the bot to your current voice channel"
 )
-async def join(ctx: discord.ApplicationContext):
-    player = await get_or_connect_player(ctx)
-    if player:
-        await ctx.respond(f"Joined: {player.channel.name}", ephemeral=True)
-
-
-@bot.slash_command(name="leave", description="Disconnect the bot from voice")
-async def leave(ctx: discord.ApplicationContext):
-    player: wavelink.Player = ctx.voice_client
-    if not player or not player.is_connected():
-        await ctx.respond("I'm not connected to any voice channel.", ephemeral=True)
+async def join(inter: discord.Interaction):
+    player = await get_or_connect_player(inter)
+    if not player:
         return
+    await inter.response.send_message(f"Joined: {player.channel.name}", ephemeral=True)
 
+
+@bot.tree.command(name="leave", description="Disconnect the bot from voice")
+async def leave(inter: discord.Interaction):
+    player: wavelink.Player = inter.guild.voice_client if inter.guild else None
+    if not player or not player.is_connected():
+        await inter.response.send_message(
+            "I'm not connected to any voice channel.", ephemeral=True
+        )
+        return
     await player.disconnect()
-    await ctx.respond("Disconnected.", ephemeral=True)
+    await inter.response.send_message("Disconnected.", ephemeral=True)
 
 
-@bot.slash_command(name="stop", description="Stop playback and clear queue")
-async def stop(ctx: discord.ApplicationContext):
-    player: wavelink.Player = ctx.voice_client
+@bot.tree.command(name="stop", description="Stop playback and clear queue")
+async def stop(inter: discord.Interaction):
+    player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player or not player.is_connected():
-        await ctx.respond("I'm not in a voice channel.", ephemeral=True)
+        await inter.response.send_message("I'm not in a voice channel.", ephemeral=True)
         return
-
     if not player.is_playing() and player.queue.is_empty:
-        await ctx.respond("Nothing is playing.", ephemeral=True)
+        await inter.response.send_message("Nothing is playing.", ephemeral=True)
         return
-
     player.queue.clear()
     await player.stop()
-    await ctx.respond("Stopped playback and cleared queue.", ephemeral=True)
+    await inter.response.send_message(
+        "Stopped playback and cleared queue.", ephemeral=True
+    )
 
 
-@bot.slash_command(
+@bot.tree.command(
     name="play",
     description="Play a song from query, URL (YouTube, SoundCloud, Spotify)",
 )
-async def play(ctx: discord.ApplicationContext, query: str):
-    await ctx.defer()
+@app_commands.describe(query="Song name or URL")
+async def play(inter: discord.Interaction, query: str):
+    await inter.response.defer(thinking=True, ephemeral=False)
 
-    player = await get_or_connect_player(ctx)
+    player = await get_or_connect_player(inter)
     if not player:
         return
 
     try:
         tracks: wavelink.Search = await wavelink.search(query)
         if not tracks:
-            await ctx.respond(f"No results found for: `{query}`")
+            await inter.followup.send(f"No results found for: `{query}`")
             return
-
     except Exception as e:
-        await ctx.respond(f"An error occurred during search: {e}")
+        await inter.followup.send(f"An error occurred during search: {e}")
         return
 
     if isinstance(tracks, wavelink.Playlist):
         added_count = await player.queue.put_wait(tracks)
-        await ctx.respond(
-            f"Added **{added_count}** tracks from playlist `{tracks.name}` to the queue."
+        await inter.followup.send(
+            f"Added {added_count} tracks from playlist `{tracks.name}` to the queue."
         )
     else:
         track = tracks[0]
         await player.queue.put_wait(track)
-        await ctx.respond(f"Added to queue: **{track.title}**")
+        await inter.followup.send(f"Added to queue: **{track.title}**")
 
     if not player.is_playing():
         await player.play_next()
 
 
-@bot.slash_command(name="queue", description="View the current song queue")
-async def queue_cmd(ctx: discord.ApplicationContext):
-    player: wavelink.Player = ctx.voice_client
+@bot.tree.command(name="queue", description="View the current song queue")
+async def queue_cmd(inter: discord.Interaction):
+    player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player:
-        await ctx.respond("I'm not connected to voice.", ephemeral=True)
+        await inter.response.send_message("I'm not connected to voice.", ephemeral=True)
         return
 
     embed = discord.Embed(title="🎵 Song Queue", color=discord.Color.blue())
-
     if player.current:
         embed.add_field(
             name="Now Playing", value=f"**{player.current.title}**", inline=False
@@ -169,35 +169,34 @@ async def queue_cmd(ctx: discord.ApplicationContext):
         )
         if len(player.queue) > 10:
             queue_list += f"\n... and {len(player.queue) - 10} more"
-
         embed.add_field(
             name=f"Up Next ({len(player.queue)} songs)", value=queue_list, inline=False
         )
 
-    await ctx.respond(embed=embed)
+    await inter.response.send_message(embed=embed)
 
 
-@bot.slash_command(name="skip", description="Skip the current song")
-async def skip(ctx: discord.ApplicationContext):
-    player: wavelink.Player = ctx.voice_client
+@bot.tree.command(name="skip", description="Skip the current song")
+async def skip(inter: discord.Interaction):
+    player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player or not player.is_playing():
-        await ctx.respond("Nothing is playing.", ephemeral=True)
+        await inter.response.send_message("Nothing is playing.", ephemeral=True)
         return
-
     await player.stop()
-    await ctx.respond("Skipped!", ephemeral=True)
+    await inter.response.send_message("Skipped!", ephemeral=True)
 
 
-@bot.slash_command(name="clear", description="Clear the entire queue")
-async def clear(ctx: discord.ApplicationContext):
-    player: wavelink.Player = ctx.voice_client
+@bot.tree.command(name="clear", description="Clear the entire queue")
+async def clear(inter: discord.Interaction):
+    player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player or player.queue.is_empty:
-        await ctx.respond("Queue is already empty.", ephemeral=True)
+        await inter.response.send_message("Queue is already empty.", ephemeral=True)
         return
-
     count = len(player.queue)
     player.queue.clear()
-    await ctx.respond(f"Cleared {count} song(s) from queue.", ephemeral=True)
+    await inter.response.send_message(
+        f"Cleared {count} song(s) from queue.", ephemeral=True
+    )
 
 
 if __name__ == "__main__":
