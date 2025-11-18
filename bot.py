@@ -6,6 +6,7 @@ from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 import wavelink
+from bot_logic import on_wavelink_track_end as on_wavelink_track_end_logic
 
 load_dotenv()
 
@@ -39,14 +40,7 @@ async def on_wavelink_node_ready(node: wavelink.Node):
 @bot.event
 async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
     """Event fired when a track ends. Used for auto-play."""
-    player = payload.player
-    if not player:
-        return
-
-    try:
-        await player.play_next()
-    except Exception as e:
-        print(f"Error playing next track: {e}")
+    await on_wavelink_track_end_logic(payload)
 
 
 async def get_or_connect_player(ctx) -> wavelink.Player | None:
