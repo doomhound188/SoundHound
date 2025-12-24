@@ -6,7 +6,7 @@ from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 import wavelink
-from bot_logic import on_wavelink_track_end as on_wavelink_track_end_logic
+from bot_logic import on_wavelink_track_end as on_wavelink_track_end_logic, validate_query
 
 load_dotenv()
 
@@ -153,6 +153,13 @@ async def stop(inter: discord.Interaction):
 async def play(inter: discord.Interaction, query: str):
     await inter.response.defer(thinking=True)
 
+    # 1. Security: Validate input
+    try:
+        query = validate_query(query)
+    except ValueError as e:
+        await inter.followup.send(f"Invalid query: {e}")
+        return
+
     player = await get_or_connect_player(inter)
     if not player:
         return
@@ -161,10 +168,15 @@ async def play(inter: discord.Interaction, query: str):
         # Wavelink 3.x search API
         results = await wavelink.Playable.search(query)
         if not results:
-            await inter.followup.send(f"No results found for: `{query}`")
+            # We sanitize the query in the output just in case, though backticks help
+            # Limiting the output length of query prevents massive messages if query was just under limit
+            safe_query = query[:100] + "..." if len(query) > 100 else query
+            await inter.followup.send(f"No results found for: `{safe_query}`")
             return
     except Exception as e:
-        await inter.followup.send(f"An error occurred during search: {e}")
+        # 2. Security: Don't leak exception details to user
+        print(f"Search error for query '{query}': {e}")
+        await inter.followup.send("An error occurred during search. Please try again later.")
         return
 
     # results can be a list of Tracks or a Playlist object (depends on source)

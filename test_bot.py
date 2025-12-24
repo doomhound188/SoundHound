@@ -58,5 +58,32 @@ class TestOnWavelinkTrackEnd(unittest.IsolatedAsyncioTestCase):
         mock_player.play_next.assert_called_once()
 
 
+class TestValidateQuery(unittest.TestCase):
+    """
+    Tests for the validate_query function in bot_logic.py.
+    """
+
+    def test_validate_query_valid(self):
+        query = "valid query"
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, query)
+
+    def test_validate_query_empty(self):
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query("")
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query("   ")
+
+    def test_validate_query_too_long(self):
+        query = "a" * 1001
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_max_length(self):
+        query = "a" * 1000
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, query)
+
+
 if __name__ == '__main__':
     unittest.main()
