@@ -1,5 +1,6 @@
 import os
 import asyncio
+import itertools
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -205,16 +206,18 @@ async def queue_cmd(inter: discord.Interaction):
     if player.queue.is_empty:
         embed.description = "Queue is empty."
     else:
-        # Wavelink 3 queue is iterable; build up to 10 items
-        q_items = list(player.queue)
+        # Optimize: Iterate directly over queue instead of copying to list
+        # Wavelink 3 queue is iterable; use islice to get first 10 items
         queue_list = "\n".join(
-            [f"{i + 1}. {t.title}" for i, t in enumerate(q_items[:10])]
+            [f"{i + 1}. {t.title}" for i, t in enumerate(itertools.islice(player.queue, 10))]
         )
-        if len(q_items) > 10:
-            queue_list += f"\n... and {len(q_items) - 10} more"
+
+        queue_len = len(player.queue)
+        if queue_len > 10:
+            queue_list += f"\n... and {queue_len - 10} more"
 
         embed.add_field(
-            name=f"Up Next ({len(q_items)} songs)", value=queue_list, inline=False
+            name=f"Up Next ({queue_len} songs)", value=queue_list, inline=False
         )
 
     await inter.response.send_message(embed=embed)
@@ -238,7 +241,7 @@ async def clear(inter: discord.Interaction):
         await inter.response.send_message("Queue is already empty.", ephemeral=True)
         return
 
-    count = len(list(player.queue))
+    count = len(player.queue)
     player.queue.clear()
     await inter.response.send_message(
         f"Cleared {count} song(s) from queue.", ephemeral=True
