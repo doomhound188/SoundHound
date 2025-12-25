@@ -160,13 +160,20 @@ async def play(inter: discord.Interaction, query: str):
         await inter.followup.send(f"Invalid query: {e}")
         return
 
-    player = await get_or_connect_player(inter)
+    # Optimize: concurrently connect to voice and search for tracks
+    # This reduces the total time by overlapping the voice connection and search latency.
+    player_task = asyncio.create_task(get_or_connect_player(inter))
+    search_task = asyncio.create_task(wavelink.Playable.search(query))
+
+    player = await player_task
     if not player:
+        # If connection failed, we don't need the search results
+        search_task.cancel()
         return
 
     try:
         # Wavelink 3.x search API
-        results = await wavelink.Playable.search(query)
+        results = await search_task
         if not results:
             # We sanitize the query in the output just in case, though backticks help
             # Limiting the output length of query prevents massive messages if query was just under limit
