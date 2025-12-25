@@ -150,6 +150,7 @@ async def stop(inter: discord.Interaction):
     description="Play a song from query, URL (YouTube, SoundCloud, Spotify)",
 )
 @app_commands.describe(query="Song name or URL")
+@app_commands.checks.cooldown(1, 5.0, key=lambda i: (i.guild_id, i.user.id))
 async def play(inter: discord.Interaction, query: str):
     await inter.response.defer(thinking=True)
 
@@ -182,7 +183,9 @@ async def play(inter: discord.Interaction, query: str):
             return
     except Exception as e:
         # 2. Security: Don't leak exception details to user
-        print(f"Search error for query '{query}': {e}")
+        # Sanitize query in logs to prevent log injection
+        safe_query_log = query.replace("\n", " ").replace("\r", " ")
+        print(f"Search error for query '{safe_query_log}': {e}")
         await inter.followup.send("An error occurred during search. Please try again later.")
         return
 
@@ -265,6 +268,22 @@ async def clear(inter: discord.Interaction):
     await inter.response.send_message(
         f"Cleared {count} song(s) from queue.", ephemeral=True
     )
+
+
+@bot.tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"Slow down! Try again in {error.retry_after:.2f}s", ephemeral=True
+        )
+    else:
+        print(f"App command error: {error}")
+        if not interaction.response.is_done():
+            await interaction.response.send_message(
+                "An error occurred while processing the command.", ephemeral=True
+            )
 
 
 @bot.event
