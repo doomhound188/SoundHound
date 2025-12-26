@@ -192,23 +192,34 @@ async def play(inter: discord.Interaction, query: str):
     # results can be a list of Tracks or a Playlist object (depends on source)
     if isinstance(results, wavelink.Playlist):
         # Playlist: add all tracks
-        for t in results.tracks:
-            player.queue.put(t)
-        await inter.followup.send(
-            f"Added {len(results.tracks)} tracks from playlist `{results.name}` to the queue."
-        )
-        if not player.playing:
-            first = player.queue.get()
-            await player.play(first)
-    else:
-        # Assume list of tracks; add first
-        track = results[0]
-        player.queue.put(track)
-        await inter.followup.send(f"Added to queue: **{track.title}**")
+        # Optimization: play the first track immediately if idle
+        tracks = results.tracks
+        if not tracks:
+            await inter.followup.send("Playlist is empty.")
+            return
 
+        start_index = 0
         if not player.playing:
-            next_track = player.queue.get()
-            await player.play(next_track)
+            await player.play(tracks[0])
+            start_index = 1
+
+        for t in itertools.islice(tracks, start_index, None):
+            player.queue.put(t)
+
+        await inter.followup.send(
+            f"Added {len(tracks)} tracks from playlist `{results.name}` to the queue."
+        )
+    else:
+        # Assume list of tracks
+        track = results[0]
+
+        # Optimization: play immediately if idle, skipping queue operations
+        if not player.playing:
+            await player.play(track)
+            await inter.followup.send(f"Playing: **{track.title}**")
+        else:
+            player.queue.put(track)
+            await inter.followup.send(f"Added to queue: **{track.title}**")
 
 
 @bot.tree.command(name="queue", description="View the current song queue")
