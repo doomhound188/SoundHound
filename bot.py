@@ -6,7 +6,11 @@ from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 import wavelink
-from bot_logic import on_wavelink_track_end as on_wavelink_track_end_logic, validate_query
+from bot_logic import (
+    on_wavelink_track_end as on_wavelink_track_end_logic,
+    validate_query,
+    search_with_cache,
+)
 
 load_dotenv()
 
@@ -164,7 +168,7 @@ async def play(inter: discord.Interaction, query: str):
     # Optimize: concurrently connect to voice and search for tracks
     # This reduces the total time by overlapping the voice connection and search latency.
     player_task = asyncio.create_task(get_or_connect_player(inter))
-    search_task = asyncio.create_task(wavelink.Playable.search(query))
+    search_task = asyncio.create_task(search_with_cache(query))
 
     player = await player_task
     if not player:
