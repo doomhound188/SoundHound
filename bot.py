@@ -93,14 +93,13 @@ async def get_or_connect_player(
         player = await inter.user.voice.channel.connect(cls=wavelink.Player)
         return player
     except Exception as e:
+        # Security: Don't leak exception details (e.g., internal IPs) to user
+        print(f"Voice connection error: {e}")
+        msg = "Failed to connect to voice channel. Please check permissions and try again."
         if not inter.response.is_done():
-            await inter.response.send_message(
-                f"Failed to connect to voice channel: {e}", ephemeral=True
-            )
+            await inter.response.send_message(msg, ephemeral=True)
         else:
-            await inter.followup.send(
-                f"Failed to connect to voice channel: {e}", ephemeral=True
-            )
+            await inter.followup.send(msg, ephemeral=True)
         return None
 
 
