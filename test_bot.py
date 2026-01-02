@@ -17,11 +17,11 @@ class TestOnWavelinkTrackEnd(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_wavelink_track_end_empty_queue_does_not_play_next(self):
         """
-        It checks that play_next is NOT called when the queue is empty.
+        It checks that play is NOT called when the queue is empty.
         """
         # Arrange
         mock_player = MagicMock()
-        mock_player.play_next = AsyncMock()
+        mock_player.play = AsyncMock()
 
         mock_queue = MagicMock()
         mock_queue.is_empty = True
@@ -34,18 +34,20 @@ class TestOnWavelinkTrackEnd(unittest.IsolatedAsyncioTestCase):
         await bot_logic.on_wavelink_track_end(mock_payload)
 
         # Assert
-        mock_player.play_next.assert_not_called()
+        mock_player.play.assert_not_called()
 
     async def test_on_wavelink_track_end_non_empty_queue_plays_next(self):
         """
-        It checks that play_next IS called when the queue is not empty.
+        It checks that play IS called with the next track when the queue is not empty.
         """
         # Arrange
         mock_player = MagicMock()
-        mock_player.play_next = AsyncMock()
+        mock_player.play = AsyncMock()
 
         mock_queue = MagicMock()
         mock_queue.is_empty = False
+        mock_track = MagicMock()
+        mock_queue.get.return_value = mock_track
         type(mock_player).queue = PropertyMock(return_value=mock_queue)
 
         mock_payload = MagicMock()
@@ -55,7 +57,7 @@ class TestOnWavelinkTrackEnd(unittest.IsolatedAsyncioTestCase):
         await bot_logic.on_wavelink_track_end(mock_payload)
 
         # Assert
-        mock_player.play_next.assert_called_once()
+        mock_player.play.assert_called_once_with(mock_track)
 
 
 class TestValidateQuery(unittest.TestCase):
