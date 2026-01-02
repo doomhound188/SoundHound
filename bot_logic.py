@@ -44,6 +44,9 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
         return
 
     try:
-        await player.play_next()
+        # Optimization: Prevent costly exception handling by calling the correct method directly.
+        # Wavelink 3.x Player does not have a play_next() method, which caused an AttributeError
+        # and stopped playback. Using queue.get() restores O(1) track transition.
+        await player.play(player.queue.get())
     except Exception as e:
         print(f"Error playing next track: {e}")
