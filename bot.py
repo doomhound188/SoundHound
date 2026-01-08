@@ -103,6 +103,16 @@ async def get_or_connect_player(
         return None
 
 
+def is_privileged(inter: discord.Interaction, player: wavelink.Player) -> bool:
+    """
+    Check if the user is privileged to modify playback state.
+    User must be in the same voice channel as the bot.
+    """
+    if not isinstance(inter.user, discord.Member) or not inter.user.voice or not inter.user.voice.channel:
+        return False
+    return inter.user.voice.channel.id == player.channel.id
+
+
 # Slash commands via app_commands (commands.Bot + bot.tree)
 @bot.tree.command(
     name="join", description="Invite the bot to your current voice channel"
@@ -123,6 +133,12 @@ async def leave(inter: discord.Interaction):
         )
         return
 
+    if not is_privileged(inter, player):
+        await inter.response.send_message(
+            "You must be in the same voice channel to use this command.", ephemeral=True
+        )
+        return
+
     await player.disconnect()
     await inter.response.send_message("Disconnected.", ephemeral=True)
 
@@ -132,6 +148,12 @@ async def stop(inter: discord.Interaction):
     player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player or not player.connected:
         await inter.response.send_message("I'm not in a voice channel.", ephemeral=True)
+        return
+
+    if not is_privileged(inter, player):
+        await inter.response.send_message(
+            "You must be in the same voice channel to use this command.", ephemeral=True
+        )
         return
 
     if not player.playing and player.queue.is_empty:
@@ -266,6 +288,12 @@ async def skip(inter: discord.Interaction):
         await inter.response.send_message("Nothing is playing.", ephemeral=True)
         return
 
+    if not is_privileged(inter, player):
+        await inter.response.send_message(
+            "You must be in the same voice channel to use this command.", ephemeral=True
+        )
+        return
+
     await player.stop()
     await inter.response.send_message("Skipped!", ephemeral=True)
 
@@ -275,6 +303,12 @@ async def clear(inter: discord.Interaction):
     player: wavelink.Player = inter.guild.voice_client if inter.guild else None
     if not player or player.queue.is_empty:
         await inter.response.send_message("Queue is already empty.", ephemeral=True)
+        return
+
+    if not is_privileged(inter, player):
+        await inter.response.send_message(
+            "You must be in the same voice channel to use this command.", ephemeral=True
+        )
         return
 
     count = len(player.queue)
