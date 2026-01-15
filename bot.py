@@ -10,6 +10,7 @@ from bot_logic import (
     on_wavelink_track_end as on_wavelink_track_end_logic,
     validate_query,
     search_with_cache,
+    MAX_QUEUE_SIZE,
 )
 
 load_dotenv()
@@ -223,6 +224,13 @@ async def play(inter: discord.Interaction, query: str):
             await inter.followup.send("Playlist is empty.")
             return
 
+        # Security: Check queue limit
+        if len(player.queue) + len(tracks) > MAX_QUEUE_SIZE:
+            await inter.followup.send(
+                f"Cannot add playlist: Queue limit ({MAX_QUEUE_SIZE}) would be exceeded."
+            )
+            return
+
         start_index = 0
         if not player.playing:
             await player.play(tracks[0])
@@ -243,6 +251,13 @@ async def play(inter: discord.Interaction, query: str):
             await player.play(track)
             await inter.followup.send(f"Playing: **{track.title}**")
         else:
+            # Security: Check queue limit
+            if len(player.queue) >= MAX_QUEUE_SIZE:
+                await inter.followup.send(
+                    f"Queue is full (max {MAX_QUEUE_SIZE}). Please wait for tracks to finish."
+                )
+                return
+
             player.queue.put(track)
             await inter.followup.send(f"Added to queue: **{track.title}**")
 
