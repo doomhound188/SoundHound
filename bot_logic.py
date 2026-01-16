@@ -19,7 +19,8 @@ def validate_query(query: str) -> str:
     if len(query) > 1000:
         raise ValueError("Query is too long (max 1000 characters).")
 
-    return query
+    # Optimization: Normalize query to improve cache hit rate (e.g. " song " -> "song")
+    return query.strip()
 
 async def search_with_cache(query: str):
     """

@@ -70,6 +70,11 @@ class TestValidateQuery(unittest.TestCase):
         result = bot_logic.validate_query(query)
         self.assertEqual(result, query)
 
+    def test_validate_query_strips_whitespace(self):
+        query = "  valid query  "
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, "valid query")
+
     def test_validate_query_empty(self):
         with self.assertRaises(ValueError):
             bot_logic.validate_query("")
