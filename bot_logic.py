@@ -5,6 +5,9 @@ from collections import OrderedDict
 MAX_CACHE_SIZE = 100
 _search_cache = OrderedDict()
 
+# Security: Max Queue Size to prevent memory exhaustion
+MAX_QUEUE_SIZE = 500
+
 def validate_query(query: str) -> str:
     """
     Validates the search query.
