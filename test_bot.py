@@ -1,5 +1,6 @@
 import sys
 import unittest
+import asyncio
 from unittest.mock import MagicMock, AsyncMock, PropertyMock
 
 # Mock wavelink
@@ -159,6 +160,28 @@ class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
 
         finally:
             bot_logic.MAX_CACHE_SIZE = original_max
+
+    async def test_search_coalescing(self):
+        query = "coalesce_me"
+
+        # Simulate delay
+        async def delayed_search(*args, **kwargs):
+            await asyncio.sleep(0.01)
+            return ["result"]
+
+        bot_logic.wavelink.Playable.search.side_effect = delayed_search
+
+        # Start two searches concurrently
+        t1 = asyncio.create_task(bot_logic.search_with_cache(query))
+        t2 = asyncio.create_task(bot_logic.search_with_cache(query))
+
+        res1, res2 = await asyncio.gather(t1, t2)
+
+        self.assertEqual(res1, ["result"])
+        self.assertEqual(res2, ["result"])
+
+        # This assertion is expected to fail before optimization
+        bot_logic.wavelink.Playable.search.assert_called_once_with(query)
 
 if __name__ == '__main__':
     unittest.main()
