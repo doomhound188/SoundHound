@@ -20,7 +20,13 @@ def validate_query(query: str) -> str:
         raise ValueError("Query is too long (max 1000 characters).")
 
     # Optimization: Normalize query to improve cache hit rate (e.g. " song " -> "song")
-    return query.strip()
+    query = query.strip()
+
+    # Security: Prevent usage of dangerous protocols (LFI risk)
+    if query.lower().startswith("file://"):
+        raise ValueError("This protocol is not supported for security reasons.")
+
+    return query
 
 async def search_with_cache(query: str):
     """
