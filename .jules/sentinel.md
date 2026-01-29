@@ -7,3 +7,8 @@
 **Vulnerability:** Input handling for the `play` command allowed dangerous protocols like `file://` in search queries.
 **Learning:** Downstream libraries (like Lavalink or Wavelink) might process file URIs if not explicitly blocked, potentially exposing local server files.
 **Prevention:** Sanitized user input in `bot_logic.validate_query` to strictly block `file://` protocol before processing.
+
+## 2026-10-18 - HTTPS Downgrade in Lavalink Connection
+**Vulnerability:** The bot explicitly stripped `https://` from the `LAVALINK_URI` and hardcoded `http://`, forcing insecure connections even when SSL was configured.
+**Learning:** Hardcoded URI reconstruction can inadvertently disable security features. Always respect the provided scheme or use library defaults that handle parsing correctly.
+**Prevention:** Updated `parse_lavalink_uri` to detect and preserve the URI scheme (http/https).

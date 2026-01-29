@@ -20,12 +20,14 @@ LAVALINK_URI = os.getenv("LAVALINK_URI", "http://lavalink:2333")
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
 
 
-# Parse host/port from LAVALINK_URI
-# supports forms like http://host:2333 or host:2333
-def parse_host_port(uri: str) -> tuple[str, int]:
+# Parse URI from LAVALINK_URI
+# supports forms like https://host:2333, http://host:2333 or host:2333
+def parse_lavalink_uri(uri: str) -> str:
+    scheme = "https" if uri.startswith("https://") else "http"
     u = uri.replace("http://", "").replace("https://", "")
     host, _, port = u.partition(":")
-    return host, int(port) if port else 2333
+    port_val = int(port) if port else 2333
+    return f"{scheme}://{host}:{port_val}"
 
 
 intents = discord.Intents.default()
@@ -40,8 +42,7 @@ wl: wavelink.Node | None = None
 async def on_ready():
     print(f"{bot.user} is online in {len(bot.guilds)} guild(s).")
     try:
-        host, port = parse_host_port(LAVALINK_URI)
-        uri = f"http://{host}:{port}"
+        uri = parse_lavalink_uri(LAVALINK_URI)
 
         # Build node object
         node = wavelink.Node(uri=uri, password=LAVALINK_PASSWORD)
