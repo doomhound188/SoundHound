@@ -15,17 +15,20 @@ def validate_query(query: str) -> str:
     Validates the search query.
     Raises ValueError if the query is invalid (too long or empty).
     """
-    if not query or not query.strip():
+    # Optimization: Perform strip once to avoid redundant allocation
+    if not query:
+        raise ValueError("Query cannot be empty.")
+
+    query = query.strip()
+    if not query:
         raise ValueError("Query cannot be empty.")
 
     if len(query) > 1000:
         raise ValueError("Query is too long (max 1000 characters).")
 
-    # Optimization: Normalize query to improve cache hit rate (e.g. " song " -> "song")
-    query = query.strip()
-
     # Security: Prevent usage of dangerous protocols (LFI risk)
-    if query.lower().startswith("file://"):
+    # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
+    if query[:7].lower() == "file://":
         raise ValueError("This protocol is not supported for security reasons.")
 
     return query
