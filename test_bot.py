@@ -97,6 +97,33 @@ class TestValidateQuery(unittest.TestCase):
         with self.assertRaises(ValueError):
             bot_logic.validate_query(query)
 
+    def test_validate_query_blocks_ssrf_localhost(self):
+        query = "http://localhost:8080/metrics"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_ssrf_metadata(self):
+        query = "http://169.254.169.254/latest/meta-data/"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_ssrf_ipv6_loopback(self):
+        query = "http://[::1]:8080"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_null_byte_bypass(self):
+        # "file\0://" -> "file://" which should be blocked
+        query = "file\0://etc/passwd"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_sanitizes_null_bytes_valid(self):
+        # Ensure null bytes are removed from otherwise valid queries
+        query = "valid\0 query"
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, "valid query")
+
 
 class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
     """

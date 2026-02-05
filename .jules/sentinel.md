@@ -7,3 +7,8 @@
 **Vulnerability:** Input handling for the `play` command allowed dangerous protocols like `file://` in search queries.
 **Learning:** Downstream libraries (like Lavalink or Wavelink) might process file URIs if not explicitly blocked, potentially exposing local server files.
 **Prevention:** Sanitized user input in `bot_logic.validate_query` to strictly block `file://` protocol before processing.
+
+## 2026-02-18 - Null Byte Injection in Input Validation
+**Vulnerability:** Input validation for `file://` protocol could be bypassed using null bytes (e.g., `file\0://`), which `strip()` does not remove.
+**Learning:** Python's `strip()` only removes whitespace. Security filters relying on string matching must sanitize control characters (specifically null bytes) *before* validation.
+**Prevention:** Sanitized input using `.replace("\0", "")` before applying protocol checks in `bot_logic.validate_query`.

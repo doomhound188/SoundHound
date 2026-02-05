@@ -22,11 +22,19 @@ def validate_query(query: str) -> str:
         raise ValueError("Query is too long (max 1000 characters).")
 
     # Optimization: Normalize query to improve cache hit rate (e.g. " song " -> "song")
-    query = query.strip()
+    # Security: Remove null bytes to prevent filter bypass
+    query = query.replace("\0", "").strip()
 
     # Security: Prevent usage of dangerous protocols (LFI risk)
     if query.lower().startswith("file://"):
         raise ValueError("This protocol is not supported for security reasons.")
+
+    # Security: Prevent SSRF (Server-Side Request Forgery) to local/metadata endpoints
+    lower_query = query.lower()
+    if lower_query.startswith(("http://", "https://")):
+        forbidden = ["localhost", "127.0.0.1", "::1", "169.254."]
+        if any(f in lower_query for f in forbidden):
+            raise ValueError("Restricted IP/Host in URL.")
 
     return query
 
