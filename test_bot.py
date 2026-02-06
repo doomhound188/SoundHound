@@ -97,6 +97,11 @@ class TestValidateQuery(unittest.TestCase):
         with self.assertRaises(ValueError):
             bot_logic.validate_query(query)
 
+    def test_validate_query_blocks_file_protocol_mixed_case(self):
+        query = "FILE:///etc/passwd"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
 
 class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
     """
