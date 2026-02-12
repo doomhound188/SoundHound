@@ -102,6 +102,35 @@ class TestValidateQuery(unittest.TestCase):
         with self.assertRaises(ValueError):
             bot_logic.validate_query(query)
 
+    def test_validate_query_blocks_localhost(self):
+        query = "http://localhost:8080/secret"
+        with self.assertRaises(ValueError) as cm:
+            bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
+
+    def test_validate_query_blocks_loopback_ip(self):
+        query = "http://127.0.0.1:8080"
+        with self.assertRaises(ValueError) as cm:
+            bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
+
+    def test_validate_query_blocks_ipv6_loopback(self):
+        query = "http://[::1]"
+        with self.assertRaises(ValueError) as cm:
+            bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
+
+    def test_validate_query_blocks_metadata_service(self):
+        query = "http://169.254.169.254/latest/meta-data/"
+        with self.assertRaises(ValueError) as cm:
+            bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
+
+    def test_validate_query_allows_external_url(self):
+        query = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, query)
+
 
 class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
     """
