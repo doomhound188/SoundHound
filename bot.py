@@ -283,7 +283,7 @@ async def queue_cmd(inter: discord.Interaction):
         # Optimize: Iterate directly over queue instead of copying to list
         # Wavelink 3 queue is iterable; use islice to get first 10 items
         queue_list = "\n".join(
-            [f"{i + 1}. {t.title}" for i, t in enumerate(itertools.islice(player.queue, 10))]
+            f"{i + 1}. {t.title}" for i, t in enumerate(itertools.islice(player.queue, 10))
         )
 
         queue_len = len(player.queue)
