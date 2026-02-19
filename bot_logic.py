@@ -1,5 +1,6 @@
 import wavelink
 import asyncio
+from urllib.parse import urlparse
 from collections import OrderedDict
 
 # LRU Cache settings
@@ -30,6 +31,27 @@ def validate_query(query: str) -> str:
     # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
     if query[:7].lower() == "file://":
         raise ValueError("This protocol is not supported for security reasons.")
+
+    # Security: Prevent SSRF (Server-Side Request Forgery)
+    # Block requests to local network and cloud metadata services
+    if query.lower().startswith(("http://", "https://")):
+        try:
+            parsed = urlparse(query)
+            hostname = parsed.hostname
+            if hostname and hostname.lower() in {
+                "localhost",
+                "127.0.0.1",
+                "::1",
+                "0.0.0.0",
+                "169.254.169.254",
+            }:
+                raise ValueError(f"Access to {hostname} is restricted.")
+        except ValueError as e:
+            # Re-raise our own ValueError
+            raise e
+        except Exception:
+            # If URL parsing fails, we treat it as a search query, not a URL
+            pass
 
     return query
 
