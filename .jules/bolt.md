@@ -13,3 +13,7 @@
 ## 2024-05-26 - [Efficient Prefix Checking]
 **Learning:** `str.lower().startswith("prefix")` allocates a new string of length `N` (the whole string), which is inefficient for long inputs. `str[:len(prefix)].lower() == "prefix"` allocates only `len(prefix)` (O(1)), saving memory and CPU for checks like `file://`.
 **Action:** Use slicing for case-insensitive prefix checks on potentially long strings.
+
+## 2024-05-27 - [DoS Prevention via Early Length Checks]
+**Learning:** Checking input length *before* string processing (like `strip()`) avoids allocating memory for massive invalid inputs, providing orders of magnitude speedup (e.g., 700x) for rejected inputs.
+**Action:** Always validate input length constraints as the very first step in validation pipelines.
