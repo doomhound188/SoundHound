@@ -102,6 +102,41 @@ class TestValidateQuery(unittest.TestCase):
         with self.assertRaises(ValueError):
             bot_logic.validate_query(query)
 
+    def test_validate_query_blocks_localhost(self):
+        query = "http://localhost:8080/metrics"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_loopback_ip(self):
+        query = "http://127.0.0.1:8080"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_ipv6_loopback(self):
+        query = "http://[::1]:8080"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_zero_ip(self):
+        query = "http://0.0.0.0:8080"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_blocks_metadata_service(self):
+        query = "http://169.254.169.254/latest/meta-data/"
+        with self.assertRaises(ValueError):
+            bot_logic.validate_query(query)
+
+    def test_validate_query_allows_valid_urls(self):
+        query = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, query)
+
+    def test_validate_query_allows_search_queries(self):
+        query = "some song name"
+        result = bot_logic.validate_query(query)
+        self.assertEqual(result, query)
+
 
 class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
     """

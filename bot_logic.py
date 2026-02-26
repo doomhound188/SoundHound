@@ -1,6 +1,7 @@
 import wavelink
 import asyncio
 from collections import OrderedDict
+from urllib.parse import urlparse
 
 # LRU Cache settings
 MAX_CACHE_SIZE = 100
@@ -30,6 +31,20 @@ def validate_query(query: str) -> str:
     # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
     if query[:7].lower() == "file://":
         raise ValueError("This protocol is not supported for security reasons.")
+
+    # Security: SSRF Protection
+    # Prevent requests to local or metadata services
+    try:
+        parsed = urlparse(query)
+    except ValueError:
+        # urlparse might raise ValueError for some invalid inputs, but we let them pass
+        # as they might be valid search queries that Lavalink handles.
+        parsed = None
+
+    if parsed and parsed.scheme in ("http", "https") and parsed.hostname:
+        hostname = parsed.hostname.lower()
+        if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"):
+            raise ValueError("This host is not supported for security reasons.")
 
     return query
 

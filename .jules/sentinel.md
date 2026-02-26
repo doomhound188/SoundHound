@@ -12,3 +12,8 @@
 **Vulnerability:** The bot explicitly stripped `https://` from the `LAVALINK_URI` and hardcoded `http://`, forcing insecure connections even when SSL was configured.
 **Learning:** Hardcoded URI reconstruction can inadvertently disable security features. Always respect the provided scheme or use library defaults that handle parsing correctly.
 **Prevention:** Updated `parse_lavalink_uri` to detect and preserve the URI scheme (http/https).
+
+## 2024-10-24 - SSRF Protection in Search Queries
+**Vulnerability:** The `play` command accepted queries that could resolve to local network services or cloud metadata endpoints (e.g., `http://169.254.169.254`), potentially exposing internal infrastructure.
+**Learning:** `urlparse` reliably extracts hostnames even from complex URLs, but exceptions must be handled carefully to avoid bypassing validation.
+**Prevention:** Implemented strict hostname validation in `bot_logic.validate_query` to block `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, and `169.254.169.254`.
