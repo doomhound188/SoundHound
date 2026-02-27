@@ -19,12 +19,13 @@ def validate_query(query: str) -> str:
     if not query:
         raise ValueError("Query cannot be empty.")
 
+    # Optimization: Check length BEFORE strip to prevent DoS from massive allocations (e.g. 10MB whitespace)
+    if len(query) > 1000:
+        raise ValueError("Query is too long (max 1000 characters).")
+
     query = query.strip()
     if not query:
         raise ValueError("Query cannot be empty.")
-
-    if len(query) > 1000:
-        raise ValueError("Query is too long (max 1000 characters).")
 
     # Security: Prevent usage of dangerous protocols (LFI risk)
     # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
