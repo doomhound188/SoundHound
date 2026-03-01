@@ -13,3 +13,7 @@
 ## 2024-05-26 - [Efficient Prefix Checking]
 **Learning:** `str.lower().startswith("prefix")` allocates a new string of length `N` (the whole string), which is inefficient for long inputs. `str[:len(prefix)].lower() == "prefix"` allocates only `len(prefix)` (O(1)), saving memory and CPU for checks like `file://`.
 **Action:** Use slicing for case-insensitive prefix checks on potentially long strings.
+
+## 2025-05-27 - [Generator Expressions in String Joins]
+**Learning:** Using `join([x for x in ...])` creates a full list in memory before joining. `join(x for x in ...)` uses a generator, iterating lazily and saving memory allocation, especially for large sequences.
+**Action:** Always use generator expressions inside `str.join()` unless the list is needed elsewhere.
