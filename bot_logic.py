@@ -2,6 +2,8 @@ import wavelink
 import asyncio
 from collections import OrderedDict
 from urllib.parse import urlparse
+import socket
+import ipaddress
 
 # LRU Cache settings
 MAX_CACHE_SIZE = 100
@@ -11,9 +13,9 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
-    Validates the search query.
+    Validates the search query asynchronously.
     Raises ValueError if the query is invalid (too long or empty).
     """
     # Optimization: Perform strip once to avoid redundant allocation
@@ -47,10 +49,36 @@ def validate_query(query: str) -> str:
             pass
 
         if hostname:
-            # Check against blacklist
+            # Check against blacklist (string match for quick rejection)
             blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
             if hostname.lower() in blocked_hosts:
                 raise ValueError("This host is blocked for security reasons.")
+
+            # Resolve the hostname to prevent IP obfuscation bypasses (e.g. hex, octal, DNS rebinding)
+            ip = None
+            try:
+                # Offload blocking DNS resolution to a separate thread to prevent blocking the event loop
+                loop = asyncio.get_running_loop()
+                # getaddrinfo returns a list of 5-tuples: (family, type, proto, canonname, sockaddr)
+                # We extract the IP address from the sockaddr tuple
+                # We use a wrapper with asyncio.wait_for to enforce a 1.0 second timeout safely
+                addr_info = await asyncio.wait_for(
+                    loop.getaddrinfo(hostname, None, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM),
+                    timeout=1.0
+                )
+
+                if addr_info:
+                    # Take the first resolved address
+                    ip_str = addr_info[0][4][0]
+                    ip = ipaddress.ip_address(ip_str)
+            except (asyncio.TimeoutError, socket.gaierror, ValueError, IndexError):
+                # If resolution fails or times out, we assume it's safe to pass to wavelink
+                pass
+
+            if ip:
+                # Check if the IP falls into restricted ranges
+                if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified:
+                    raise ValueError("This host resolves to a restricted network and is blocked for security reasons.")
 
     return query
 
