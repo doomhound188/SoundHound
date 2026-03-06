@@ -36,8 +36,10 @@ def validate_query(query: str) -> str:
     # Security: Prevent SSRF (Server-Side Request Forgery)
     # Block requests to local/metadata addresses
     # Optimization: Check prefix before parsing to avoid overhead on regular search queries
-    lower_query = query.lower()
-    if lower_query.startswith("http://") or lower_query.startswith("https://"):
+    # and use slicing to avoid creating a new lowercased string of the entire query (O(1) vs O(N))
+    is_http = query[:7].lower() == "http://"
+    is_https = query[:8].lower() == "https://"
+    if is_http or is_https:
         hostname = None
         try:
             parsed = urlparse(query)
