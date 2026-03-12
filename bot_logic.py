@@ -2,6 +2,8 @@ import wavelink
 import asyncio
 from collections import OrderedDict
 from urllib.parse import urlparse
+import socket
+import ipaddress
 
 # LRU Cache settings
 MAX_CACHE_SIZE = 100
@@ -11,7 +13,7 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
     Validates the search query.
     Raises ValueError if the query is invalid (too long or empty).
@@ -47,9 +49,30 @@ def validate_query(query: str) -> str:
             pass
 
         if hostname:
-            # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
+            # Clean IPv6 bracket notation if present
+            clean_hostname = hostname.strip("[]")
+            try:
+                loop = asyncio.get_running_loop()
+                addr_info = await asyncio.wait_for(
+                    loop.getaddrinfo(clean_hostname, None, proto=socket.IPPROTO_TCP),
+                    timeout=2.0
+                )
+            except Exception:
+                # If we fail to resolve, assume it's dangerous or invalid.
+                raise ValueError("This host is blocked for security reasons.")
+
+            is_blocked = False
+            for info in addr_info:
+                ip_str = info[4][0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified:
+                        is_blocked = True
+                        break
+                except ValueError:
+                    pass
+
+            if is_blocked:
                 raise ValueError("This host is blocked for security reasons.")
 
     return query
