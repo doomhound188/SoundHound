@@ -17,3 +17,7 @@
 ## 2025-05-27 - [Generator Expressions in String Joins]
 **Learning:** Using `join([x for x in ...])` creates a full list in memory before joining. `join(x for x in ...)` uses a generator, iterating lazily and saving memory allocation, especially for large sequences.
 **Action:** Always use generator expressions inside `str.join()` unless the list is needed elsewhere.
+
+## 2025-05-28 - [Memory Allocation Optimization for Prefix Checks]
+**Learning:** `query.lower().startswith(...)` allocates a completely new string in memory for `query.lower()` before performing the check. For long input strings, this is unnecessary and causes performance degradation.
+**Action:** Always use string slicing up to the needed length (`query[:length].lower() == ...`) for case-insensitive prefix checks to optimize memory usage and avoid O(N) allocation overhead.
