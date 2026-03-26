@@ -1,5 +1,7 @@
 import wavelink
 import asyncio
+import socket
+import ipaddress
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -11,7 +13,7 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
     Validates the search query.
     Raises ValueError if the query is invalid (too long or empty).
@@ -34,7 +36,7 @@ def validate_query(query: str) -> str:
         raise ValueError("This protocol is not supported for security reasons.")
 
     # Security: Prevent SSRF (Server-Side Request Forgery)
-    # Block requests to local/metadata addresses
+    # Block requests to local/metadata addresses using DNS resolution
     # Optimization: Check prefix before parsing to avoid overhead on regular search queries
     lower_query = query.lower()
     if lower_query.startswith("http://") or lower_query.startswith("https://"):
@@ -43,14 +45,38 @@ def validate_query(query: str) -> str:
             parsed = urlparse(query)
             hostname = parsed.hostname
         except ValueError:
-            # If urlparse fails, we might still want to be careful, but we proceed
-            pass
+            # If urlparse fails, fail closed for security
+            raise ValueError("Invalid URL format.")
 
         if hostname:
-            # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
-                raise ValueError("This host is blocked for security reasons.")
+            # Remove IPv6 brackets for resolution
+            clean_hostname = hostname.strip('[]')
+
+            loop = asyncio.get_running_loop()
+            try:
+                # Use SOCK_STREAM to limit results and prevent thread pool exhaustion
+                addr_info = await asyncio.wait_for(
+                    loop.getaddrinfo(clean_hostname, None, type=socket.SOCK_STREAM),
+                    timeout=2.0
+                )
+            except (socket.gaierror, asyncio.TimeoutError) as e:
+                # Fail closed if we can't resolve the host
+                raise ValueError("Could not resolve hostname or timeout.")
+
+            for res in addr_info:
+                # getaddrinfo returns a list of tuples: (family, type, proto, canonname, sockaddr)
+                # For IPv4, sockaddr is (host, port). For IPv6, it is (host, port, flowinfo, scopeid)
+                # res[4][0] will always be the IP address string
+                ip_str = res[4][0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_loopback or ip.is_private or ip.is_unspecified or ip.is_link_local:
+                        raise ValueError("This host is blocked for security reasons.")
+                except ValueError as e:
+                    if "This host is blocked" in str(e):
+                        raise e
+                    # Not a valid IP, fail closed
+                    raise ValueError("Invalid IP returned from resolution.")
 
     return query
 
