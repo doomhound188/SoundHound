@@ -28,16 +28,17 @@ def validate_query(query: str) -> str:
     if not query:
         raise ValueError("Query cannot be empty.")
 
+    # Optimization: Get a short prefix for fast case-insensitive protocol checks, avoiding O(N) lowercasing of the entire string
+    query_prefix = query[:8].lower()
+
     # Security: Prevent usage of dangerous protocols (LFI risk)
-    # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
-    if query[:7].lower() == "file://":
+    if query_prefix.startswith("file://"):
         raise ValueError("This protocol is not supported for security reasons.")
 
     # Security: Prevent SSRF (Server-Side Request Forgery)
     # Block requests to local/metadata addresses
     # Optimization: Check prefix before parsing to avoid overhead on regular search queries
-    lower_query = query.lower()
-    if lower_query.startswith("http://") or lower_query.startswith("https://"):
+    if query_prefix.startswith("http://") or query_prefix.startswith("https://"):
         hostname = None
         try:
             parsed = urlparse(query)
