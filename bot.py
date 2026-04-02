@@ -183,7 +183,7 @@ async def play(inter: discord.Interaction, query: str):
 
     # 1. Security: Validate input
     try:
-        query = validate_query(query)
+        query = await validate_query(query)
     except ValueError as e:
         await inter.followup.send(f"Invalid query: {e}")
         return

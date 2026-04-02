@@ -1,5 +1,7 @@
 import wavelink
 import asyncio
+import socket
+import ipaddress
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -11,10 +13,10 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
     Validates the search query.
-    Raises ValueError if the query is invalid (too long or empty).
+    Raises ValueError if the query is invalid (too long or empty) or if it points to an internal/blocked IP.
     """
     # Optimization: Perform strip once to avoid redundant allocation
     if not query:
@@ -34,7 +36,7 @@ def validate_query(query: str) -> str:
         raise ValueError("This protocol is not supported for security reasons.")
 
     # Security: Prevent SSRF (Server-Side Request Forgery)
-    # Block requests to local/metadata addresses
+    # Block requests to local/metadata addresses via DNS resolution
     # Optimization: Check prefix before parsing to avoid overhead on regular search queries
     lower_query = query.lower()
     if lower_query.startswith("http://") or lower_query.startswith("https://"):
@@ -47,10 +49,20 @@ def validate_query(query: str) -> str:
             pass
 
         if hostname:
-            # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
-                raise ValueError("This host is blocked for security reasons.")
+            hostname_clean = hostname.strip("[]")
+            try:
+                loop = asyncio.get_running_loop()
+                info = await asyncio.wait_for(
+                    loop.getaddrinfo(hostname_clean, None, type=socket.SOCK_STREAM),
+                    timeout=2.0
+                )
+            except (socket.gaierror, asyncio.TimeoutError):
+                raise ValueError("Failed to resolve host.")
+
+            for res in info:
+                ip = ipaddress.ip_address(res[4][0])
+                if ip.is_loopback or ip.is_private or ip.is_unspecified or ip.is_link_local:
+                    raise ValueError("This host is blocked for security reasons.")
 
     return query
 

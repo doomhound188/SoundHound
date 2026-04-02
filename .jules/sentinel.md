@@ -17,3 +17,8 @@
 **Vulnerability:** The `validate_query` function checked for `file://` protocol but allowed HTTP/HTTPS requests to any host, including `localhost`, `127.0.0.1`, and cloud metadata services.
 **Learning:** Checking protocol prefixes is insufficient. Validating the hostname is critical when the application can be tricked into making requests to internal resources.
 **Prevention:** Enhanced `validate_query` to parse URLs starting with `http://` or `https://` and block requests to a blacklist of dangerous hostnames (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `169.254.169.254`).
+
+## 2024-04-02 - [CRITICAL] Fixed SSRF Vulnerability via Static Blacklist Bypass
+**Vulnerability:** The application was using a static blacklist of strings `{"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}` to prevent Server-Side Request Forgery (SSRF) when processing URLs. This could easily be bypassed using DNS rebinding, alternative IP representations (e.g., `0177.0.0.1`), or services like `127.0.0.1.nip.io`.
+**Learning:** Security controls that rely strictly on literal string matching for hostnames are usually insufficient, as hostnames can resolve dynamically to protected IPs, and alternative syntax can represent the same underlying blocked addresses.
+**Prevention:** DNS resolution must be used prior to checking. In an async context, this involves `asyncio.get_running_loop().getaddrinfo()` with an explicit `type=socket.SOCK_STREAM` and timeout to prevent DoS. Then use the `ipaddress` library to definitively check if the resolved IP belongs to a forbidden range (`is_loopback`, `is_private`, `is_unspecified`, `is_link_local`).
