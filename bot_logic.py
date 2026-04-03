@@ -35,9 +35,9 @@ def validate_query(query: str) -> str:
 
     # Security: Prevent SSRF (Server-Side Request Forgery)
     # Block requests to local/metadata addresses
-    # Optimization: Check prefix before parsing to avoid overhead on regular search queries
-    lower_query = query.lower()
-    if lower_query.startswith("http://") or lower_query.startswith("https://"):
+    # Optimization: Check prefix using slicing to avoid lowercasing the entire string (O(1) vs O(N))
+    lower_prefix = query[:8].lower()
+    if lower_prefix.startswith("http://") or lower_prefix.startswith("https://"):
         hostname = None
         try:
             parsed = urlparse(query)
@@ -48,8 +48,9 @@ def validate_query(query: str) -> str:
 
         if hostname:
             # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
+            # Optimization: Inline the set literal so Python optimizes it into a cached frozenset constant at compile-time.
+            # This avoids O(N) allocation overhead of building a new set from scratch on every function call.
+            if hostname.lower() in {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}:
                 raise ValueError("This host is blocked for security reasons.")
 
     return query
