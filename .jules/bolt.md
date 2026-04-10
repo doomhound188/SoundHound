@@ -14,6 +14,10 @@
 **Learning:** `str.lower().startswith("prefix")` allocates a new string of length `N` (the whole string), which is inefficient for long inputs. `str[:len(prefix)].lower() == "prefix"` allocates only `len(prefix)` (O(1)), saving memory and CPU for checks like `file://`.
 **Action:** Use slicing for case-insensitive prefix checks on potentially long strings.
 
-## 2025-05-27 - [Generator Expressions in String Joins]
+## 2024-05-27 - [Generator Expressions in String Joins]
 **Learning:** Using `join([x for x in ...])` creates a full list in memory before joining. `join(x for x in ...)` uses a generator, iterating lazily and saving memory allocation, especially for large sequences.
 **Action:** Always use generator expressions inside `str.join()` unless the list is needed elsewhere.
+
+## 2024-05-28 - [Frozenset Constant Caching]
+**Learning:** When checking membership against a static set inside a function (e.g., `if val in {"a", "b"}`), Python 3 compiles the inline set literal into a cached `frozenset` constant (`LOAD_CONST`). If the set is assigned to a variable first (`my_set = {"a", "b"}`), CPython rebuilds it on every function call (`BUILD_SET`).
+**Action:** Always use inline set literals for static membership checks to avoid runtime allocation overhead.
