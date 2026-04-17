@@ -48,8 +48,9 @@ def validate_query(query: str) -> str:
 
         if hostname:
             # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
+            # Optimization: Inline set literal allows CPython to compile it as a cached frozenset,
+            # avoiding creating a new set object on every call (O(1) allocation overhead).
+            if hostname.lower() in {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}:
                 raise ValueError("This host is blocked for security reasons.")
 
     return query
