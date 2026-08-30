@@ -1,5 +1,7 @@
 import wavelink
 import asyncio
+import socket
+import ipaddress
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -11,7 +13,7 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
     Validates the search query.
     Raises ValueError if the query is invalid (too long or empty).
@@ -47,10 +49,34 @@ def validate_query(query: str) -> str:
             pass
 
         if hostname:
-            # Check against blacklist
+            # Strip IPv6 brackets if present
+            clean_hostname = hostname.strip('[]')
+
+            # Check against blacklist (fast path)
             blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
+            if clean_hostname.lower() in blocked_hosts:
                 raise ValueError("This host is blocked for security reasons.")
+
+            # Perform DNS resolution to prevent obfuscated IPs (Note: Lavalink is still vulnerable to TOCTOU DNS rebinding)
+            try:
+                loop = asyncio.get_running_loop()
+                # Use wait_for to prevent hanging on DNS resolution
+                addr_info = await asyncio.wait_for(
+                    loop.getaddrinfo(clean_hostname, None, type=socket.SOCK_STREAM),
+                    timeout=2.0
+                )
+                for addr in addr_info:
+                    ip_str = addr[4][0]
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_loopback or ip.is_private or ip.is_unspecified or ip.is_link_local:
+                        raise ValueError(f"Resolved IP {ip_str} is blocked for security reasons.")
+            except asyncio.TimeoutError:
+                raise ValueError("DNS resolution timed out.")
+            except (socket.gaierror, ValueError) as e:
+                # Fail closed if resolution fails or if ip is blocked
+                if "blocked" in str(e):
+                    raise
+                raise ValueError("Invalid hostname or DNS resolution failed.")
 
     return query
 
