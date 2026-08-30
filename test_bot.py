@@ -61,75 +61,89 @@ class TestOnWavelinkTrackEnd(unittest.IsolatedAsyncioTestCase):
         mock_player.play.assert_called_once_with(mock_track)
 
 
-class TestValidateQuery(unittest.TestCase):
+class TestValidateQuery(unittest.IsolatedAsyncioTestCase):
     """
     Tests for the validate_query function in bot_logic.py.
     """
 
-    def test_validate_query_valid(self):
+    async def test_validate_query_valid(self):
         query = "valid query"
-        result = bot_logic.validate_query(query)
+        result = await bot_logic.validate_query(query)
         self.assertEqual(result, query)
 
-    def test_validate_query_strips_whitespace(self):
+    async def test_validate_query_strips_whitespace(self):
         query = "  valid query  "
-        result = bot_logic.validate_query(query)
+        result = await bot_logic.validate_query(query)
         self.assertEqual(result, "valid query")
 
-    def test_validate_query_empty(self):
+    async def test_validate_query_empty(self):
         with self.assertRaises(ValueError):
-            bot_logic.validate_query("")
+            await bot_logic.validate_query("")
         with self.assertRaises(ValueError):
-            bot_logic.validate_query("   ")
+            await bot_logic.validate_query("   ")
 
-    def test_validate_query_too_long(self):
+    async def test_validate_query_too_long(self):
         query = "a" * 1001
         with self.assertRaises(ValueError):
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
 
-    def test_validate_query_max_length(self):
+    async def test_validate_query_max_length(self):
         query = "a" * 1000
-        result = bot_logic.validate_query(query)
+        result = await bot_logic.validate_query(query)
         self.assertEqual(result, query)
 
-    def test_validate_query_blocks_file_protocol(self):
+    async def test_validate_query_blocks_file_protocol(self):
         query = "file:///etc/passwd"
         with self.assertRaises(ValueError):
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
 
-    def test_validate_query_blocks_file_protocol_mixed_case(self):
+    async def test_validate_query_blocks_file_protocol_mixed_case(self):
         query = "FILE:///etc/passwd"
         with self.assertRaises(ValueError):
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
 
-    def test_validate_query_blocks_localhost(self):
+    async def test_validate_query_blocks_localhost(self):
         query = "http://localhost:8080/secret"
         with self.assertRaises(ValueError) as cm:
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
         self.assertIn("This host is blocked", str(cm.exception))
 
-    def test_validate_query_blocks_loopback_ip(self):
+    async def test_validate_query_blocks_loopback_ip(self):
         query = "http://127.0.0.1:8080"
         with self.assertRaises(ValueError) as cm:
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
         self.assertIn("This host is blocked", str(cm.exception))
 
-    def test_validate_query_blocks_ipv6_loopback(self):
+    async def test_validate_query_blocks_ipv6_loopback(self):
         query = "http://[::1]"
         with self.assertRaises(ValueError) as cm:
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
         self.assertIn("This host is blocked", str(cm.exception))
 
-    def test_validate_query_blocks_metadata_service(self):
+    async def test_validate_query_blocks_metadata_service(self):
         query = "http://169.254.169.254/latest/meta-data/"
         with self.assertRaises(ValueError) as cm:
-            bot_logic.validate_query(query)
+            await bot_logic.validate_query(query)
         self.assertIn("This host is blocked", str(cm.exception))
 
-    def test_validate_query_allows_external_url(self):
+    async def test_validate_query_allows_external_url(self):
         query = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        result = bot_logic.validate_query(query)
+        result = await bot_logic.validate_query(query)
         self.assertEqual(result, query)
+
+    async def test_validate_query_blocks_obfuscated_hex(self):
+        # 127.0.0.1 as hex
+        query = "http://0x7f.0.0.1"
+        with self.assertRaises(ValueError) as cm:
+            await bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
+
+    async def test_validate_query_blocks_obfuscated_decimal(self):
+        # 127.0.0.1 as decimal
+        query = "http://2130706433"
+        with self.assertRaises(ValueError) as cm:
+            await bot_logic.validate_query(query)
+        self.assertIn("This host is blocked", str(cm.exception))
 
 
 class TestSearchWithCache(unittest.IsolatedAsyncioTestCase):
