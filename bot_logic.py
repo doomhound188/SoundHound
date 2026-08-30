@@ -1,5 +1,7 @@
 import wavelink
 import asyncio
+import socket
+import ipaddress
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -11,10 +13,10 @@ _pending_searches = {}
 # Security: Max Queue Size to prevent memory exhaustion
 MAX_QUEUE_SIZE = 500
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
-    Validates the search query.
-    Raises ValueError if the query is invalid (too long or empty).
+    Validates the search query asynchronously.
+    Raises ValueError if the query is invalid (too long or empty) or points to a blocked host.
     """
     # Optimization: Perform strip once to avoid redundant allocation
     if not query:
@@ -47,10 +49,28 @@ def validate_query(query: str) -> str:
             pass
 
         if hostname:
-            # Check against blacklist
-            blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254"}
-            if hostname.lower() in blocked_hosts:
-                raise ValueError("This host is blocked for security reasons.")
+            clean_hostname = hostname.strip("[]")
+            loop = asyncio.get_running_loop()
+            try:
+                # Use type=socket.SOCK_STREAM to limit returned results and mitigate thread pool exhaustion
+                addr_info = await asyncio.wait_for(
+                    loop.getaddrinfo(clean_hostname, None, type=socket.SOCK_STREAM),
+                    timeout=2.0
+                )
+                for res in addr_info:
+                    ip_str = res[4][0]
+                    try:
+                        ip = ipaddress.ip_address(ip_str)
+                        if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified:
+                            raise ValueError("This host is blocked for security reasons.")
+                    except ValueError as e:
+                        if str(e) == "This host is blocked for security reasons.":
+                            raise e
+                        pass
+            except (socket.gaierror, asyncio.TimeoutError):
+                raise ValueError("Could not resolve host or timed out.")
+            except ValueError as e:
+                raise e
 
     return query
 

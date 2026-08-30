@@ -1,6 +1,17 @@
 import unittest
 import os
 import sys
+from unittest.mock import MagicMock
+
+# Mock discord and wavelink before import
+mock_discord = MagicMock()
+sys.modules['discord'] = mock_discord
+sys.modules['discord.ext'] = MagicMock()
+sys.modules['discord.ext.commands'] = MagicMock()
+sys.modules['wavelink'] = MagicMock()
+sys.modules['dotenv'] = MagicMock()
+mock_app_commands = MagicMock()
+sys.modules['discord.app_commands'] = mock_app_commands
 
 # Set env vars to prevent import errors or side effects
 os.environ["DISCORD_TOKEN"] = "dummy_token"

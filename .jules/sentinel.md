@@ -17,3 +17,8 @@
 **Vulnerability:** The `validate_query` function checked for `file://` protocol but allowed HTTP/HTTPS requests to any host, including `localhost`, `127.0.0.1`, and cloud metadata services.
 **Learning:** Checking protocol prefixes is insufficient. Validating the hostname is critical when the application can be tricked into making requests to internal resources.
 **Prevention:** Enhanced `validate_query` to parse URLs starting with `http://` or `https://` and block requests to a blacklist of dangerous hostnames (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `169.254.169.254`).
+
+## 2026-12-05 - SSRF via Obfuscated IPs and DNS Rebinding
+**Vulnerability:** The string-based blacklist for hostnames failed to catch obfuscated IPs (like hex `0x7f000001` or octal) pointing to loopback, private, or unspecified ranges.
+**Learning:** String matching on hostnames is an insufficient protection for SSRF, as it can be easily bypassed using varied encodings or DNS rebinding (resolving an external name to an internal IP). Hostnames must be properly resolved and validated using standard IP libraries.
+**Prevention:** Migrated `validate_query` to resolve hostnames asynchronously using `asyncio.get_running_loop().getaddrinfo()` and checking if the actual resolved `ipaddress.ip_address` belongs to loopback, private, link-local, or unspecified ranges.
