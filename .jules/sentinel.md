@@ -17,3 +17,8 @@
 **Vulnerability:** The `validate_query` function checked for `file://` protocol but allowed HTTP/HTTPS requests to any host, including `localhost`, `127.0.0.1`, and cloud metadata services.
 **Learning:** Checking protocol prefixes is insufficient. Validating the hostname is critical when the application can be tricked into making requests to internal resources.
 **Prevention:** Enhanced `validate_query` to parse URLs starting with `http://` or `https://` and block requests to a blacklist of dangerous hostnames (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `169.254.169.254`).
+
+## 2026-12-05 - SSRF Obfuscation Bypass via Hex/Octal/Integer IPs
+**Vulnerability:** The SSRF check was vulnerable to evasion because it only checked the literal URL hostname against a string-based blacklist. Attackers could obfuscate local or restricted IPs using Hex (0x7f000001), Octal (0177.0.0.1), or Integer (2852039166) formats to reach restricted targets like `127.0.0.1` and `169.254.169.254`.
+**Learning:** String-matching against hostnames is insufficient to block SSRF. The application must perform asynchronous DNS resolution (e.g., using `asyncio.get_running_loop().getaddrinfo`) and evaluate the underlying IP address using libraries like `ipaddress` for strict range-based validation (e.g. `is_loopback`, `is_private`).
+**Prevention:** Updated `validate_query` to an `async` function and implemented an IP validation step post-resolution, properly blocking obfuscated IPs. Implemented tests to catch hex, octal, and integer variants. Synchronous calls like `socket.gethostbyname()` and global state changes like `socket.setdefaulttimeout()` must be strictly avoided to prevent blocking the async loop.
