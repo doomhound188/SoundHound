@@ -17,3 +17,7 @@
 ## 2025-05-27 - [Generator Expressions in String Joins]
 **Learning:** Using `join([x for x in ...])` creates a full list in memory before joining. `join(x for x in ...)` uses a generator, iterating lazily and saving memory allocation, especially for large sequences.
 **Action:** Always use generator expressions inside `str.join()` unless the list is needed elsewhere.
+
+## 2025-05-28 - [Inline Set Literals]
+**Learning:** Using an inline set literal in an `in` condition (e.g. `if x in {"a", "b"}`) allows CPython to optimize it into a cached `frozenset` constant at compile time. This avoids the runtime overhead of repeatedly allocating a new set object, which is particularly beneficial in heavily executed or critical paths like validation.
+**Action:** Always inline set literals for static collections used in `in` checks instead of assigning them to local variables first.
